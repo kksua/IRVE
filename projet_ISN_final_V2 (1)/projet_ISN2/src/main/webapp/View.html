@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <!-- Déclaration du type de document et de la langue -->
+    <meta charset="UTF-8">
+    <!-- Déclaration de la taille initiale de la fenêtre d'affichage -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Titre de la page -->
+    <title>IRVE</title>
+    <!-- Inclusion de la feuille de style CSS de Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <!-- Inclusion de Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Inclusion du fichier JavaScript de Leaflet -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <!-- Styles CSS personnalisés -->
+    <style>
+        /* Styles pour la taille de la carte */
+        #map {
+            height: 900px;
+        }
+
+        /* Styles pour le formulaire de recherche */
+        .input-group {
+            margin-top: 20px;
+            margin-left: 20px;
+        }
+
+        /* Styles pour réduire la taille de l'entrée du code postal */
+        .smaller-input {
+            max-width: 400px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Formulaire pour la recherche -->
+    <form id="searchForm">
+        <div class="input-group input-group-sm mb-3">
+            <!-- Libellé pour l'entrée du code postal -->
+            <span class="input-group-text" id="inputGroup-sizing-sm">Entrez le code postal des IRVE	cherchées :</span>
+            <!-- Entrée du code postal -->
+            <input type="text" class="form-control smaller-input" name="codePostal" id="codePostalInput"
+                aria-label="Sizing example input" aria-describedby="inputGroup-sizing-sm">
+            <!-- Bouton de soumission du formulaire -->
+            <button type="submit" class="btn btn-primary">Cherche</button>
+        </div>
+    </form>
+
+    <!-- Conteneur de la carte -->
+    <div id="map"></div>
+
+    <!-- Initialisation de la carte -->
+    <script>
+        // Centre la carte sur la France lors du chargement
+        var map = L.map('map').setView([46.2276, 2.2137], 6);
+        // Ajoute les tuiles OpenStreetMap à la carte
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+      // Fonction pour ajouter un marqueur sur la carte avec toutes les informations de IRVE
+function ajouterMarker(irve) {
+    var marker = L.marker([irve.lat, irve.lng]).addTo(map);
+    // Affiche les informations de la station dans une fenêtre contextuelle
+    marker.bindPopup(
+        "<b>" + irve.nomEnseigne + "</b><br>" +
+        "Adresse complète: " + irve.adresse + "<br>" +
+        "Puissance nominale: " + irve.puissanceNominal + "<br>" +
+        "Prise type EF: " + (irve.priseTypeEf ? "Disponible" : "Indisponible") + "<br>" +
+        "Prise type 2: " + (irve.priseType2 ? "Disponible" : "Indisponible") + "<br>" +
+        "Prise type Combo CCS: " + (irve.priseTypeComboCCs ? "Disponible" : "Indisponible") + "<br>" +
+        "Prise type CHAdeMO: " + (irve.priseTypeChademo ? "Disponible" : "Indisponible") + "<br>" +
+        "Prise type Autre: " + (irve.priseTypeAutre ? "Disponible" : "Indisponible")
+    );
+}
+
+
+        // Fonction pour ajouter un simple repère sur la carte
+        function ajouterPin(lat, lng) {
+            var marker = L.marker([lat, lng]).addTo(map);
+        }
+
+        // Fonction pour chercher les coordonnées XY à partir du code postal
+        function chercheCoordonneesXY(codePostal) {
+            // Efface tous les marqueurs existants sur la carte
+            map.eachLayer(function (layer) {
+                if (layer instanceof L.Marker) {
+                    map.removeLayer(layer);
+                }
+            });
+
+            // Requête AJAX pour obtenir les données des stations IRVE en fonction du code postal
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", "SearchIRVE?codePostal=" + encodeURIComponent(codePostal), true);
+            xhr.onload = function () {
+                if (xhr.status === 200) {
+                    var irves = JSON.parse(xhr.responseText);
+                    if (irves.length === 0) {
+                        // Si aucune station IRVE n'est trouvée, notifier l'utilisateur
+                        alert("Aucune station trouvée pour le code postal : " + codePostal);
+                    } else {
+                        var group = []; // Crée un tableau pour stocker les objets L.LatLng de chaque marqueur
+                        irves.forEach(function (irve) {
+                            ajouterMarker(irve);
+                             // Ajoute les coordonnées dans le tableau
+                            group.push(L.latLng(irve.lat, irve.lng));
+                        });
+                        if (group.length > 0) {
+                            // Utilise les coordonnées pour centrer la carte
+                            var bounds = L.latLngBounds(group);
+                            // Centre la carte et ajuste le zoom sur les marqueurs
+                            map.fitBounds(bounds); 
+                        }
+                    }
+                } else {
+                    // En cas d'erreur lors de la requête, affiche un message d'erreur
+                    alert('Une erreur est survenue : ' + xhr.statusText);
+                }
+            };
+            xhr.send();
+        }
+
+        // Gestionnaire de soumission du formulaire
+        document.getElementById("searchForm").addEventListener("submit", function (event) {
+            // Empêche le rechargement de la page lors de la soumission du formulaire
+            event.preventDefault();
+            var codePostal = document.getElementById("codePostalInput").value;
+            // Vérifie si le code postal est valide
+            if (!/^\d{5}$/.test(codePostal)) {
+                alert("Veuillez entrer un code postal valide à 5 chiffres.");
+                return;
+            }
+            // Recherche les coordonnées XY en fonction du code postal
+            chercheCoordonneesXY(codePostal);
+        });
+    </script>
+</body>
+
+</html>
